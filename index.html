@@ -381,8 +381,37 @@ syncGuide();
 document.querySelectorAll(".zoom-btn").forEach(b=>b.onclick=()=>{document.getElementById("modalImg").src=b.dataset.img;document.getElementById("modal").classList.add("open")});document.getElementById("modalClose").onclick=()=>document.getElementById("modal").classList.remove("open");
 
 async function rpc(name,args){let {data,error}=await sb.rpc(name,args);if(error)throw error;return data;}
-document.getElementById("sessionBtn").onclick=async()=>{try{let u=prompt("Usuario de facilitador");if(!u)return;let p=prompt("PIN");if(!p)return;let login=await rpc("facilitator_login",{p_username:u,p_pin:p});if(!login.success)throw new Error(login.error||"Login inválido");accessToken=login.access_token;let s=await rpc("create_live_session",{p_access_token:accessToken,p_title:"Capacitación · Atención a Leads API en Pilot"});sessionId=s.session_id;sessionCode=s.code;document.getElementById("sessionInfo").innerHTML=`<b>Sesión ${sessionCode}</b><br>Participantes:<br><code>${location.origin+location.pathname}?role=participant&code=${sessionCode}</code>`}catch(e){alert(e.message)}};
-document.querySelectorAll(".launch").forEach(btn=>btn.onclick=async()=>{if(!sessionId){alert("Primero crea la sesión desde Guía.");document.getElementById("guide").classList.add("open");return}try{let kind=btn.dataset.kind,opts=btn.dataset.options?JSON.parse(btn.dataset.options):[],corr=btn.dataset.correct!==undefined?Number(btn.dataset.correct):null;await rpc("facilitator_launch_exercise",{p_access_token:accessToken,p_session_id:sessionId,p_exercise_key:btn.dataset.key+"_"+Date.now(),p_type:kind,p_title:btn.dataset.title,p_prompt:"",p_question:btn.dataset.question,p_options:opts,p_correct_answer:corr,p_explanation:btn.dataset.explanation||""});btn.textContent="Actividad abierta ✓"}catch(e){alert(e.message)}});
+document.getElementById("sessionBtn").onclick=async()=>{try{
+let u=prompt("Usuario de facilitador");if(!u)return;
+let p=prompt("PIN");if(!p)return;
+let login=await rpc("facilitator_login",{p_username:u,p_pin:p});
+if(!login.success)throw new Error(login.error||"Login inválido");
+accessToken=login.access_token;
+let created=await rpc("create_live_session",{p_access_token:accessToken,p_title:"Capacitación · Atención a Leads API en Pilot"});
+sessionId=created.session_id;
+sessionCode=created.code;
+const joinUrl=`${location.origin+location.pathname}?role=participant&code=${sessionCode}`;
+document.getElementById("sessionInfo").innerHTML=`<b>Sesión ${sessionCode}</b><br>QR y participantes disponibles en <b>Participantes</b>.`;
+document.getElementById("noLive").style.display="none";
+document.getElementById("liveContent").style.display="block";
+document.getElementById("liveCode").textContent=sessionCode;
+document.getElementById("liveUrl").textContent=joinUrl;
+const canvas=document.getElementById("qrCanvas");
+if(window.QRCode && QRCode.toCanvas){
+  QRCode.toCanvas(canvas,joinUrl,{width:150,margin:1},function(err){if(err)console.error(err);});
+}else{
+  const wrap=canvas.parentElement;
+  canvas.style.display="none";
+  const fallback=document.createElement("img");
+  fallback.alt="Código QR";
+  fallback.width=150; fallback.height=150;
+  fallback.src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data="+encodeURIComponent(joinUrl);
+  wrap.prepend(fallback);
+}
+document.getElementById("livePanel").classList.add("open");
+startDashboard();
+}catch(e){alert(e.message)}};
+document.querySelectorAll(".launch").forEach(btn=>btn.onclick=async()=>{if(!sessionId){alert("Primero crea la sesión desde Guía.");document.getElementById("guide").classList.add("open");return}try{let kind=btn.dataset.kind,opts=btn.dataset.options?JSON.parse(btn.dataset.options):[],corr=btn.dataset.correct!==undefined?Number(btn.dataset.correct):null;await rpc("facilitator_launch_exercise",{p_access_token:accessToken,p_session_id:sessionId,p_exercise_key:btn.dataset.key+"_"+Date.now(),p_type:kind,p_title:btn.dataset.title,p_prompt:"",p_question:btn.dataset.question,p_options:opts,p_correct_answer:corr,p_explanation:btn.dataset.explanation||""});btn.textContent="Actividad abierta ✓";refreshDashboard()}catch(e){alert(e.message)}});
 
 
 let dashboardTimer=null;
